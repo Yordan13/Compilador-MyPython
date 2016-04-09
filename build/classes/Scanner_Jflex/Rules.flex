@@ -165,21 +165,17 @@ SingleCharacter = [^\r\n\'\\]
   \"                             { yybegin(STRING); string.setLength(0); }
 
   /* character literal */
-  \'                             { yybegin(STRING); string.setLength(0); }
+  \'                             { yybegin(CHARLITERAL); string.setLength(0); }
 
   /* numeric literals */
-
-  /* This is matched together with the minus, because the number is too big to 
-     be represented by a positive integer. */
-  "-2147483648"                  { _TokenList.add(new IntegerToken("-2147483648",yyline)); }
   
-  {DecIntegerLiteral}            { _TokenList.add(new IntegerToken(yytext(),yyline)); }
+  {DecIntegerLiteral}            { return new IntegerToken(yytext(),yyline); }
   
-  {HexIntegerLiteral}            { _TokenList.add(new IntegerToken(parseLong(2, yylength(), 16),yyline)); }
+  {HexIntegerLiteral}            { return new IntegerToken(parseLong(2, yylength(), 16),yyline); }
  
-  {OctIntegerLiteral}            { _TokenList.add(new IntegerToken(parseLong(2, yylength(), 16),yyline)); }  
+  {OctIntegerLiteral}            { return new IntegerToken(parseLong(2, yylength(), 16),yyline); }  
   
-  {FloatLiteral}                 { _TokenList.add(new FloatToken(yytext().substring(0,yylength()-1),yyline); }
+  {FloatLiteral}                 { return new FloatToken(yytext().substring(0,yylength()-1),yyline); }
   
   /* comments */
   {Comment}                      { /* ignore */ }
@@ -188,11 +184,11 @@ SingleCharacter = [^\r\n\'\\]
   {WhiteSpace}                   { /* ignore */ }
 
   /* identifiers */ 
-  {Identifier}                   { _TokenList.add(new IdentifierToken(yytext(),yyline)); }
+  {Identifier}                   { return new IdentifierToken(yytext(),yyline); }
 }
 
 <STRING> {
-  \"                             { yybegin(YYINITIAL); _TokenList.add(new StringToken(string.toString(),yyline); }
+  \"                             { yybegin(YYINITIAL); return new StringToken("\""+string.toString()+"\"",yyline); }
   
   {StringCharacter}+             { string.append( yytext() ); }
   
@@ -209,11 +205,30 @@ SingleCharacter = [^\r\n\'\\]
                         				   string.append( val ); }
   
   /* error cases */
-  \\.                            { _TokenList.add(new ErrorToken(yytext(),yyline)); }
-  {LineTerminator}               { _TokenList.add(new ErrorToken(yytext(),yyline)); }
+  {LineTerminator}               { return new ErrorToken(yytext(),yyline); }
+}
+
+<CHARLITERAL> {
+  {SingleCharacter}\'            { yybegin(YYINITIAL); return new symbol(CHARACTER_LITERAL, yytext().charAt(0)); }
+  
+  /* escape sequences */
+  "\\b"\'                        { yybegin(YYINITIAL); return symbol(CHARACTER_LITERAL, '\b');}
+  "\\t"\'                        { yybegin(YYINITIAL); return symbol(CHARACTER_LITERAL, '\t');}
+  "\\n"\'                        { yybegin(YYINITIAL); return symbol(CHARACTER_LITERAL, '\n');}
+  "\\f"\'                        { yybegin(YYINITIAL); return symbol(CHARACTER_LITERAL, '\f');}
+  "\\r"\'                        { yybegin(YYINITIAL); return symbol(CHARACTER_LITERAL, '\r');}
+  "\\\""\'                       { yybegin(YYINITIAL); return symbol(CHARACTER_LITERAL, '\"');}
+  "\\'"\'                        { yybegin(YYINITIAL); return symbol(CHARACTER_LITERAL, '\'');}
+  "\\\\"\'                       { yybegin(YYINITIAL); return symbol(CHARACTER_LITERAL, '\\'); }
+  \\[0-3]?{OctDigit}?{OctDigit}\' { yybegin(YYINITIAL); 
+			                              int val = Integer.parseInt(yytext().substring(1,yylength()-1),8);
+			                            return symbol(CHARACTER_LITERAL, (char)val); }
+  
+  /* error cases */
+  {LineTerminator}               { return new ErrorToken(yytext(),yyline); }
 }
 
 
 /* error fallback */
-[^]                              { _TokenList.add(new ErrorToken(yytext(),yyline)); }
-<<EOF>>                          { _TokenList.add(new EOFToken("EOF",yyline)); }
+[^]                              { return new ErrorToken(yytext(),yyline); }
+<<EOF>>                          { return new EOFToken("EOF",yyline); }
